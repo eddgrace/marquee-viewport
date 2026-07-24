@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LED 跑馬燈產生器</title>
+  <!-- Load high-quality Google Fonts for marquee styling. Using legacy import for iOS 12 compatibility. -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Oswald:wght@500;700&family=Playfair+Display:ital,wght@0,600;0,800;1,600&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Full-screen Marquee Container -->
+  <div id="marquee-viewport" class="theme-black">
+    <!-- Overlay filter to simulate LED scanlines/matrix pattern for premium feel -->
+    <div class="led-overlay"></div>
+    
+    <div id="marquee-container">
+      <div id="marquee-text">歡迎光臨 跑馬燈產生器</div>
+    </div>
+  </div>
+
+  <!-- Settings Toggle Button (Floating Gear Icon) -->
+  <button id="settings-toggle" class="settings-toggle-btn" aria-label="設定選單">
+    <svg viewBox="0 0 24 24" width="24" height="24">
+      <path fill="currentColor" d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+    </svg>
+  </button>
+
+  <!-- Control Dashboard (Glassmorphism settings panel) -->
+  <div id="settings-panel" class="settings-panel hidden">
+    <div class="settings-header">
+      <h2>控制面板</h2>
+      <button id="settings-close" class="close-btn">&times;</button>
+    </div>
+    
+    <div class="settings-content">
+      <!-- Section 1: Text -->
+      <div class="setting-group">
+        <label for="text-input">跑馬燈文字</label>
+        <input type="text" id="text-input" placeholder="請輸入字幕文字..." value="歡迎光臨 跑馬燈產生器">
+      </div>
+
+      <!-- Section 2: Typography & Styling -->
+      <div class="setting-group">
+        <label for="font-family">字體選擇</label>
+        <select id="font-family">
+          <option value="'Noto Sans TC', sans-serif" selected>Noto Sans 繁中</option>
+          <option value="'Orbitron', sans-serif">Orbitron (科技 LED)</option>
+          <option value="'Oswald', sans-serif">Oswald (粗體偏窄)</option>
+          <option value="'Playfair Display', serif">Playfair (高雅襯線)</option>
+          <option value="system-ui, sans-serif">系統預設</option>
+        </select>
+      </div>
+
+      <div class="setting-group-row">
+        <div class="setting-group flex-1">
+          <label for="font-size">文字大小 (<span id="font-size-val">20</span>vh)</label>
+          <input type="range" id="font-size" min="5" max="60" value="20">
+        </div>
+      </div>
+
+      <!-- Section 3: Glow & Color -->
+      <div class="setting-group">
+        <label>字體顏色</label>
+        <div class="color-picker-wrapper">
+          <input type="color" id="font-color" value="#ff007f">
+          <span class="color-hex-val" id="color-hex-val">#ff007f</span>
+        </div>
+        
+        <div class="presets-label">快速霓虹配色</div>
+        <div class="color-presets">
+          <button class="color-preset-btn" data-color="#ff007f" style="background-color: #ff007f;" title="霓虹粉"></button>
+          <button class="color-preset-btn" data-color="#00f6ff" style="background-color: #00f6ff;" title="冰河藍"></button>
+          <button class="color-preset-btn" data-color="#39ff14" style="background-color: #39ff14;" title="螢光綠"></button>
+          <button class="color-preset-btn" data-color="#ffb700" style="background-color: #ffb700;" title="暖金黃"></button>
+          <button class="color-preset-btn" data-color="#ffffff" style="background-color: #ffffff;" title="極光白"></button>
+          <button class="color-preset-btn" data-color="#bd00ff" style="background-color: #bd00ff;" title="魅惑紫"></button>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <label for="glow-intensity">霓虹發光度 (<span id="glow-val">15</span>px)</label>
+        <input type="range" id="glow-intensity" min="0" max="60" value="15">
+      </div>
+
+      <!-- Section 4: Motion Settings -->
+      <div class="setting-group">
+        <label for="running-style">運行方式</label>
+        <select id="running-style">
+          <option value="right-to-left" selected>由右至左 (←)</option>
+          <option value="left-to-right">由左至右 (→)</option>
+          <option value="bounce">左右來回彈跳 (↔)</option>
+          <option value="static">置中靜止 (•)</option>
+        </select>
+      </div>
+
+      <div class="setting-group">
+        <label for="speed">運行速度 (<span id="speed-val">5</span>)</label>
+        <input type="range" id="speed" min="1" max="25" value="5">
+      </div>
+
+      <!-- Section 5: Background Settings -->
+      <div class="setting-group">
+        <label>背景模式</label>
+        <div class="bg-presets">
+          <button class="bg-preset-btn active" data-bg="theme-black" style="background-color: #050505;" title="經典純黑"></button>
+          <button class="bg-preset-btn" data-bg="theme-cyber" style="background: linear-gradient(135deg, #0f0c1b, #24243e);" title="賽博暗紫"></button>
+          <button class="bg-preset-btn" data-bg="theme-sunset" style="background: linear-gradient(135deg, #1f1c2c, #928dab);" title="暮色深灰"></button>
+          <button class="bg-preset-btn" data-bg="theme-matrix" style="background: radial-gradient(circle, #0c1810, #020503);" title="矩陣暗綠"></button>
+          <button class="bg-preset-btn" data-bg="theme-carbon" style="background-color: #111; background-image: radial-gradient(rgba(255,255,255,0.15) 1px, transparent 0), radial-gradient(rgba(255,255,255,0.15) 1px, transparent 0); background-size: 8px 8px; background-position: 0 0, 4px 4px;" title="微格紋理"></button>
+        </div>
+      </div>
+
+      <div class="setting-group">
+        <label>自訂背景圖片</label>
+        <div class="file-upload-wrapper">
+          <button id="upload-trigger-btn" class="upload-btn">選擇圖片</button>
+          <button id="clear-bg-image-btn" class="clear-btn hidden">移除圖片</button>
+          <input type="file" id="bg-upload" accept="image/*">
+        </div>
+        <div class="upload-tip">支援照片庫、相機或檔案。若圖片載入緩慢，建議解析度不要太大。</div>
+      </div>
+      
+      <!-- Quick Play/Pause Action -->
+      <div class="setting-actions">
+        <button id="play-pause-btn" class="primary-action-btn">暫停跑馬燈</button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
