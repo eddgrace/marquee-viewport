@@ -6,7 +6,466 @@
   <title>LED 跑馬燈產生器</title>
   <!-- Load high-quality Google Fonts for marquee styling. Using legacy import for iOS 12 compatibility. -->
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Oswald:wght@500;700&family=Playfair+Display:ital,wght@0,600;0,800;1,600&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <style>
+    /* CSS Custom Properties (Variables) - Safari 9.3+ compatible */
+    :root {
+      --font-color: #ff007f;
+      --glow-color: rgba(255, 0, 127, 0.8);
+      --glow-radius: 15px;
+      --font-size: 20vh;
+      --panel-width: 360px;
+      --accent-color: #ff007f;
+      --accent-glow: rgba(255, 0, 127, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #000;
+      color: #fff;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Fullscreen Marquee Area */
+    #marquee-viewport {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.5s ease;
+      z-index: 1;
+    }
+
+    /* LED Matrix/Scanline Overlay to simulate physical display */
+    .led-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      /* Creates horizontal lines and vertical color mask */
+      background: 
+        linear-gradient(rgba(0, 0, 0, 0.25) 50%, rgba(0, 0, 0, 0) 50%),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03), rgba(0, 0, 0, 0.05));
+      background-size: 100% 4px, 4px 100%;
+      z-index: 3;
+      pointer-events: none;
+      opacity: 0.8;
+    }
+
+    #marquee-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+      z-index: 2;
+    }
+
+    #marquee-text {
+      font-size: var(--font-size);
+      color: var(--font-color);
+      white-space: nowrap;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      position: absolute;
+      left: 0;
+      will-change: transform;
+      transform: translate3d(0, 0, 0); /* Force GPU compositing */
+      text-shadow: 
+        0 0 calc(var(--glow-radius) * 0.2) var(--glow-color),
+        0 0 var(--glow-radius) var(--glow-color),
+        0 0 calc(var(--glow-radius) * 2) var(--glow-color);
+      padding: 0 20px;
+    }
+
+    /* Theme Presets */
+    .theme-black {
+      background-color: #050505 !important;
+    }
+
+    .theme-cyber {
+      background: linear-gradient(135deg, #0d0b21 0%, #161233 50%, #201335 100%) !important;
+    }
+
+    .theme-sunset {
+      background: linear-gradient(135deg, #1f1212 0%, #120e24 50%, #0c192c 100%) !important;
+    }
+
+    .theme-matrix {
+      background: radial-gradient(circle, #081a10 0%, #030805 100%) !important;
+    }
+
+    .theme-carbon {
+      background-color: #111115 !important;
+      background-image: 
+        radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0),
+        radial-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 0) !important;
+      background-size: 16px 16px !important;
+      background-position: 0 0, 8px 8px !important;
+    }
+
+    .custom-bg-image {
+      background-size: cover !important;
+      background-position: center !important;
+      background-repeat: no-repeat !important;
+    }
+
+    /* Toggle settings button */
+    .settings-toggle-btn {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: rgba(20, 20, 25, 0.6);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: transform 0.3s ease, opacity 0.5s ease;
+    }
+
+    .settings-toggle-btn:active {
+      transform: scale(0.9);
+    }
+
+    .settings-toggle-btn.fade-out {
+      opacity: 0.15;
+    }
+
+    .settings-toggle-btn.fade-out:hover,
+    .settings-toggle-btn.fade-out:active {
+      opacity: 1;
+    }
+
+    /* Control Panel Drawer */
+    .settings-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: var(--panel-width);
+      max-width: 90%;
+      background: rgba(18, 18, 24, 0.85);
+      box-shadow: -8px 0 32px 0 rgba(0, 0, 0, 0.6);
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px); /* Essential for iOS 12 */
+      z-index: 99;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      transform: translate3d(0, 0, 0);
+    }
+
+    .settings-panel.hidden {
+      transform: translate3d(100%, 0, 0);
+    }
+
+    .settings-header {
+      padding: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .settings-header h2 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      color: #fff;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 2rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 5px;
+      transition: color 0.2s;
+    }
+
+    .close-btn:active {
+      color: #fff;
+    }
+
+    .settings-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      -webkit-overflow-scrolling: touch; /* Smooth inertia scrolling for older iOS */
+    }
+
+    /* Form Groups styling */
+    .setting-group {
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .setting-group-row {
+      display: flex;
+      gap: 16px;
+    }
+
+    .flex-1 {
+      flex: 1;
+    }
+
+    label {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: rgba(255, 255, 255, 0.6);
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input[type="text"]:focus, select:focus {
+      border-color: var(--accent-color);
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    select option {
+      background-color: #1a1a24;
+      color: #fff;
+    }
+
+    /* Range Inputs */
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+      outline: none;
+      margin: 12px 0;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent-color);
+      cursor: pointer;
+      box-shadow: 0 0 10px var(--accent-glow);
+      transition: transform 0.1s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:active {
+      transform: scale(1.3);
+    }
+
+    /* Color Picker Wrapper */
+    .color-picker-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    input[type="color"] {
+      -webkit-appearance: none;
+      border: none;
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      cursor: pointer;
+      background: none;
+    }
+
+    input[type="color"]::-webkit-color-swatch-wrapper {
+      padding: 0;
+    }
+
+    input[type="color"]::-webkit-color-swatch {
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+    }
+
+    .color-hex-val {
+      font-family: monospace;
+      font-size: 1rem;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .presets-label {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.4);
+      margin-top: 10px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    .color-presets {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .color-preset-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .color-preset-btn:active {
+      transform: scale(0.85);
+    }
+
+    /* Background Presets */
+    .bg-presets {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .bg-preset-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .bg-preset-btn:active {
+      transform: scale(0.9);
+    }
+
+    .bg-preset-btn.active {
+      border-color: #fff;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+    }
+
+    /* Custom Image Upload Buttons */
+    .file-upload-wrapper {
+      display: flex;
+      gap: 8px;
+    }
+
+    #bg-upload {
+      display: none;
+    }
+
+    .upload-btn, .clear-btn, .primary-action-btn {
+      flex: 1;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      cursor: pointer;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    .upload-btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+    }
+
+    .upload-btn:active {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .clear-btn {
+      background: rgba(255, 59, 48, 0.15);
+      border-color: rgba(255, 59, 48, 0.3);
+      color: #ff453a;
+    }
+
+    .clear-btn:active {
+      background: rgba(255, 59, 48, 0.3);
+    }
+
+    .clear-btn.hidden {
+      display: none;
+    }
+
+    .primary-action-btn {
+      background: var(--accent-color);
+      color: white;
+      border: none;
+      box-shadow: 0 4px 15px var(--accent-glow);
+      width: 100%;
+    }
+
+    .primary-action-btn:active {
+      transform: translateY(1px);
+      opacity: 0.9;
+    }
+
+    .upload-tip {
+      margin-top: 8px;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.4);
+      line-height: 1.4;
+    }
+
+    .setting-actions {
+      margin-top: 36px;
+      margin-bottom: 20px;
+    }
+
+    /* Customized scrollbar for settings content */
+    .settings-content::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .settings-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .settings-content::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 3px;
+    }
+
+    .settings-content::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+  </style>
 </head>
 <body>
 
@@ -107,7 +566,7 @@
           <button class="bg-preset-btn active" data-bg="theme-black" style="background-color: #050505;" title="經典純黑"></button>
           <button class="bg-preset-btn" data-bg="theme-cyber" style="background: linear-gradient(135deg, #0f0c1b, #24243e);" title="賽博暗紫"></button>
           <button class="bg-preset-btn" data-bg="theme-sunset" style="background: linear-gradient(135deg, #1f1c2c, #928dab);" title="暮色深灰"></button>
-          <button class="bg-preset-btn" data-bg="theme-matrix" style="background: radial-gradient(circle, #0c1810, #020503);" title="矩陣暗綠"></button>
+          <button class="bg-preset-btn" data-bg="theme-matrix" style="background: radial-gradient(circle, #081a10, #020503);" title="矩陣暗綠"></button>
           <button class="bg-preset-btn" data-bg="theme-carbon" style="background-color: #111; background-image: radial-gradient(rgba(255,255,255,0.15) 1px, transparent 0), radial-gradient(rgba(255,255,255,0.15) 1px, transparent 0); background-size: 8px 8px; background-position: 0 0, 4px 4px;" title="微格紋理"></button>
         </div>
       </div>
@@ -130,6 +589,367 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script>
+    // DOM Elements
+    const viewportEl = document.getElementById('marquee-viewport');
+    const containerEl = document.getElementById('marquee-container');
+    const textEl = document.getElementById('marquee-text');
+
+    const settingsToggle = document.getElementById('settings-toggle');
+    const settingsPanel = document.getElementById('settings-panel');
+    const settingsClose = document.getElementById('settings-close');
+
+    const textInput = document.getElementById('text-input');
+    const fontFamilySelect = document.getElementById('font-family');
+    const fontSizeInput = document.getElementById('font-size');
+    const fontSizeVal = document.getElementById('font-size-val');
+
+    const fontColorInput = document.getElementById('font-color');
+    const colorHexVal = document.getElementById('color-hex-val');
+    const colorPresetBtns = document.querySelectorAll('.color-preset-btn');
+    const glowIntensityInput = document.getElementById('glow-intensity');
+    const glowValLabel = document.getElementById('glow-val');
+
+    const runningStyleSelect = document.getElementById('running-style');
+    const speedInput = document.getElementById('speed');
+    const speedValLabel = document.getElementById('speed-val');
+
+    const bgPresetBtns = document.querySelectorAll('.bg-preset-btn');
+    const bgUploadInput = document.getElementById('bg-upload');
+    const uploadTriggerBtn = document.getElementById('upload-trigger-btn');
+    const clearBgImageBtn = document.getElementById('clear-bg-image-btn');
+
+    const playPauseBtn = document.getElementById('play-pause-btn');
+
+    // State Variables
+    let containerWidth = 0;
+    let textWidth = 0;
+    let x = 0;
+    let bounceDirection = 1;
+    let isPlaying = true;
+    let animationId = null;
+    let uploadedBgUrl = null;
+
+    // Settings Panel Interaction Timeout
+    let uiInactivityTimeout = null;
+
+    // Helper to convert hex color to rgba for glow customization
+    function hexToRgba(hex, alpha) {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
+    }
+
+    // Update measured widths of the viewport container and text
+    function updateMetrics() {
+      containerWidth = containerEl.offsetWidth;
+      textWidth = textEl.offsetWidth;
+    }
+
+    // Reset text coordinate position depending on running style
+    function resetPosition() {
+      updateMetrics();
+      const style = runningStyleSelect.value;
+      
+      if (style === 'right-to-left') {
+        x = containerWidth;
+      } else if (style === 'left-to-right') {
+        x = -textWidth;
+      } else if (style === 'bounce') {
+        // Start at the left edge
+        x = 0;
+        bounceDirection = 1;
+      } else if (style === 'static') {
+        x = (containerWidth - textWidth) / 2;
+      }
+      
+      textEl.style.transform = 'translate3d(' + x + 'px, 0, 0)';
+    }
+
+    // Trigger layout update and safely adjust coordinates (e.g. after resizing font/content)
+    function scheduleMetricsUpdate() {
+      requestAnimationFrame(function() {
+        updateMetrics();
+        const style = runningStyleSelect.value;
+        if (style === 'static') {
+          x = (containerWidth - textWidth) / 2;
+          textEl.style.transform = 'translate3d(' + x + 'px, 0, 0)';
+        } else if (style === 'bounce') {
+          const maxVal = containerWidth - textWidth;
+          if (maxVal <= 0) {
+            if (x < maxVal) x = maxVal;
+            if (x > 0) x = 0;
+          } else {
+            if (x > maxVal) x = maxVal;
+            if (x < 0) x = 0;
+          }
+          textEl.style.transform = 'translate3d(' + x + 'px, 0, 0)';
+        }
+      });
+    }
+
+    // Core animation loop driven by requestAnimationFrame (GPU-accelerated)
+    function animate() {
+      if (!isPlaying) return;
+      
+      const style = runningStyleSelect.value;
+      const speed = parseFloat(speedInput.value);
+      
+      if (style === 'right-to-left') {
+        x -= speed;
+        if (x < -textWidth) {
+          x = containerWidth;
+        }
+      } else if (style === 'left-to-right') {
+        x += speed;
+        if (x > containerWidth) {
+          x = -textWidth;
+        }
+      } else if (style === 'bounce') {
+        x += speed * bounceDirection;
+        const maxVal = containerWidth - textWidth;
+        
+        if (maxVal <= 0) {
+          // Text is longer than container, scroll back and forth between edges
+          if (x < maxVal) {
+            x = maxVal;
+            bounceDirection = 1;
+          } else if (x > 0) {
+            x = 0;
+            bounceDirection = -1;
+          }
+        } else {
+          // Text is shorter than container, bounce inside viewport boundaries
+          if (x > maxVal) {
+            x = maxVal;
+            bounceDirection = -1;
+          } else if (x < 0) {
+            x = 0;
+            bounceDirection = 1;
+          }
+        }
+      } else if (style === 'static') {
+        x = (containerWidth - textWidth) / 2;
+      }
+      
+      textEl.style.transform = 'translate3d(' + x + 'px, 0, 0)';
+      animationId = requestAnimationFrame(animate);
+    }
+
+    // Start animation loop
+    function startAnimation() {
+      if (!isPlaying) {
+        isPlaying = true;
+        playPauseBtn.textContent = '暫停跑馬燈';
+        playPauseBtn.classList.remove('paused');
+        animate();
+      }
+    }
+
+    // Pause animation loop
+    function pauseAnimation() {
+      isPlaying = false;
+      playPauseBtn.textContent = '啟動跑馬燈';
+      playPauseBtn.classList.add('paused');
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+    }
+
+    // Update text styling attributes
+    function updateTextStyles() {
+      const color = fontColorInput.value;
+      const glow = glowIntensityInput.value;
+      
+      document.documentElement.style.setProperty('--font-color', color);
+      document.documentElement.style.setProperty('--glow-color', hexToRgba(color, 0.8));
+      document.documentElement.style.setProperty('--glow-radius', glow + 'px');
+      
+      colorHexVal.textContent = color.toUpperCase();
+    }
+
+    // Auto-hide settings button for immersive viewing when user is inactive
+    function resetInactivityTimer() {
+      // Clear existing timer
+      if (uiInactivityTimeout) {
+        clearTimeout(uiInactivityTimeout);
+      }
+      
+      // Show settings toggle button
+      settingsToggle.classList.remove('fade-out');
+      
+      // If settings panel is open, do not fade it out
+      if (!settingsPanel.classList.contains('hidden')) {
+        return;
+      }
+      
+      // Set timer to fade settings button
+      uiInactivityTimeout = setTimeout(function() {
+        if (isPlaying) {
+          settingsToggle.classList.add('fade-out');
+        }
+      }, 3000);
+    }
+
+    // Event Listeners Initialization
+    function initEventListeners() {
+      // Toggle Settings Panel
+      settingsToggle.addEventListener('click', function() {
+        settingsPanel.classList.remove('hidden');
+        settingsToggle.style.display = 'none';
+        if (uiInactivityTimeout) clearTimeout(uiInactivityTimeout);
+      });
+      
+      settingsClose.addEventListener('click', function() {
+        settingsPanel.classList.add('hidden');
+        settingsToggle.style.display = 'flex';
+        resetInactivityTimer();
+      });
+
+      // Text Inputs
+      textInput.addEventListener('input', function() {
+        textEl.textContent = textInput.value || ' ';
+        scheduleMetricsUpdate();
+      });
+
+      // Fonts & Sizes
+      fontFamilySelect.addEventListener('change', function() {
+        textEl.style.fontFamily = fontFamilySelect.value;
+        scheduleMetricsUpdate();
+      });
+
+      fontSizeInput.addEventListener('input', function() {
+        const size = fontSizeInput.value;
+        fontSizeVal.textContent = size;
+        document.documentElement.style.setProperty('--font-size', size + 'vh');
+        scheduleMetricsUpdate();
+      });
+
+      // Color & Glow
+      fontColorInput.addEventListener('input', updateTextStyles);
+      
+      glowIntensityInput.addEventListener('input', function() {
+        glowValLabel.textContent = glowIntensityInput.value;
+        updateTextStyles();
+      });
+
+      // Color Presets
+      for (let i = 0; i < colorPresetBtns.length; i++) {
+        colorPresetBtns[i].addEventListener('click', function(e) {
+          const selectedColor = e.target.getAttribute('data-color');
+          fontColorInput.value = selectedColor;
+          updateTextStyles();
+        });
+      }
+
+      // Running Styles
+      runningStyleSelect.addEventListener('change', function() {
+        resetPosition();
+      });
+
+      speedInput.addEventListener('input', function() {
+        speedValLabel.textContent = speedInput.value;
+      });
+
+      // Background Presets
+      for (let i = 0; i < bgPresetBtns.length; i++) {
+        bgPresetBtns[i].addEventListener('click', function(e) {
+          // Remove active states from other background buttons
+          for (let j = 0; j < bgPresetBtns.length; j++) {
+            bgPresetBtns[j].classList.remove('active');
+          }
+          
+          const btn = e.currentTarget;
+          btn.classList.add('active');
+          
+          // Reset custom background image if set
+          viewportEl.style.backgroundImage = '';
+          viewportEl.className = btn.getAttribute('data-bg');
+        });
+      }
+
+      // Custom Background Image Uploader
+      uploadTriggerBtn.addEventListener('click', function() {
+        bgUploadInput.click();
+      });
+
+      bgUploadInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+          // Clean up previous Object URL to avoid leaks
+          if (uploadedBgUrl) {
+            URL.revokeObjectURL(uploadedBgUrl);
+          }
+          
+          uploadedBgUrl = URL.createObjectURL(file);
+          viewportEl.style.backgroundImage = "url('" + uploadedBgUrl + "')";
+          viewportEl.className = 'custom-bg-image';
+          
+          // Un-select all background presets
+          for (let j = 0; j < bgPresetBtns.length; j++) {
+            bgPresetBtns[j].classList.remove('active');
+          }
+          
+          clearBgImageBtn.classList.remove('hidden');
+        }
+      });
+
+      clearBgImageBtn.addEventListener('click', function() {
+        if (uploadedBgUrl) {
+          URL.revokeObjectURL(uploadedBgUrl);
+          uploadedBgUrl = null;
+        }
+        
+        bgUploadInput.value = '';
+        viewportEl.style.backgroundImage = '';
+        
+        // Fallback to classic black background preset
+        viewportEl.className = 'theme-black';
+        bgPresetBtns[0].classList.add('active');
+        
+        clearBgImageBtn.classList.add('hidden');
+      });
+
+      // Play / Pause button
+      playPauseBtn.addEventListener('click', function() {
+        if (isPlaying) {
+          pauseAnimation();
+        } else {
+          startAnimation();
+        }
+      });
+
+      // Inactivity tracking for UI fading
+      window.addEventListener('mousemove', resetInactivityTimer);
+      window.addEventListener('touchstart', resetInactivityTimer);
+      window.addEventListener('keydown', resetInactivityTimer);
+
+      // Auto update on window resize (iPad rotates)
+      window.addEventListener('resize', function() {
+        scheduleMetricsUpdate();
+      });
+    }
+
+    // Initial Setup
+    function init() {
+      initEventListeners();
+      updateTextStyles();
+      
+      // Set default initial font style
+      textEl.style.fontFamily = fontFamilySelect.value;
+      
+      // Wait short tick for font/layout rendering, then calculate size & animate
+      setTimeout(function() {
+        resetPosition();
+        animate();
+        resetInactivityTimer();
+      }, 100);
+    }
+
+    // Bootstrapping the app
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
 </body>
 </html>
